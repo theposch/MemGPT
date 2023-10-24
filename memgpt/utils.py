@@ -279,8 +279,8 @@ async def prepare_archival_index_from_files_compute_embeddings(
 
     # chunk the files, make embeddings
     archival_database = chunk_files(files, tkns_per_chunk, model)
-    embedding_data = await process_concurrently(archival_database, embeddings_model)
     embeddings_file = os.path.join(save_dir, "embeddings.jsonl")
+    embedding_data = await process_concurrently(archival_database, embeddings_model)
     print(f"Saving embeddings to {embeddings_file}")
     with open(embeddings_file, "w") as f:
         for embedding in embedding_data:
@@ -297,6 +297,11 @@ async def prepare_archival_index_from_files_compute_embeddings(
         for c in chunk_files_for_jsonl(files, tkns_per_chunk, model):
             json.dump(c, f)
             f.write("\n")
+
+    embedding_data = []
+    with open(embeddings_file, "rt") as f:
+        for line in f:
+            embedding_data.append(json.loads(line))
 
     # make the faiss index
     index = faiss.IndexFlatL2(1536)
