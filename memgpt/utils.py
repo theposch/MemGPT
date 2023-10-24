@@ -209,7 +209,7 @@ def chunk_files(files, tkns_per_chunk=300, model="gpt-4"):
 
 
 def chunk_files_for_jsonl(files, tkns_per_chunk=300, model="gpt-4"):
-    ret = []
+    # ret = []
     for file in files:
         file_stem = file.split("/")[-1]
         curr_file = []
@@ -220,8 +220,9 @@ def chunk_files_for_jsonl(files, tkns_per_chunk=300, model="gpt-4"):
                     "text": chunk,
                 }
             )
-        ret.append(curr_file)
-    return ret
+        yield curr_file
+        # ret.append(curr_file)
+    # return ret
 
 
 async def process_chunk(i, chunk, model):
@@ -288,12 +289,12 @@ async def prepare_archival_index_from_files_compute_embeddings(
 
     # make all_text.json
     archival_storage_file = os.path.join(save_dir, "all_docs.jsonl")
-    chunks_by_file = chunk_files_for_jsonl(files, tkns_per_chunk, model)
+    # chunks_by_file = chunk_files_for_jsonl(files, tkns_per_chunk, model)
     with open(archival_storage_file, "w") as f:
         print(
             f"Saving archival storage with preloaded files to {archival_storage_file}"
         )
-        for c in chunks_by_file:
+        for c in chunk_files_for_jsonl(files, tkns_per_chunk, model):
             json.dump(c, f)
             f.write("\n")
 
