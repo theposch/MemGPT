@@ -31,9 +31,7 @@ Add any other context about the problem here.
 **How did you install MemGPT?**
 
 - From the official package? `pip install pymemgpt`
-- From source?
-  - With [poetry](https://github.com/cpacker/MemGPT#development)?
-  - With `git clone git@github.com:cpacker/MemGPT.git` and `pip install -r requirements.txt`?
+- From [source](https://memgpt.readthedocs.io/en/latest/contributing/)?
 
 **Your setup (please complete the following information)**
 

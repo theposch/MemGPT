@@ -1,21 +1,22 @@
 # Contributing
 
 ## Installing from source
-First, install Poetry using [the official instructions here](https://python-poetry.org/docs/#installing-with-the-official-installer).
-
-Then, you can install MemGPT from source with:
+You can install MemGPT from source with:
 ```sh
 git clone git@github.com:cpacker/MemGPT.git
-poetry install -E dev
+cd MemGPT
+pip install -e .
+pip install -r requirements-dev.txt
 ```
+
 We recommend installing pre-commit to ensure proper formatting during development:
 ```sh
-poetry run pre-commit install
-poetry run pre-commit run --all-files
+pre-commit install
+pre-commit run --all-files
 ```
 
 ### Formatting
 We welcome pull requests! Please run the formatter before submitting a pull request:
 ```sh
-poetry run black . -l 140
+black . -l 140
 ```

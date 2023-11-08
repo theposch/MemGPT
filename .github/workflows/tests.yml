@@ -29,32 +29,14 @@ jobs:
       with:
         python-version: "3.10"
 
-    - name: Install poetry
-      run: pip install poetry
-
-    - name: Set Poetry config
+    - name: Install dependencies
       run: |
-        poetry config virtualenvs.in-project false
-        poetry config virtualenvs.path ~/.virtualenvs
-
-    - name: Install dependencies using Poetry
-      env:
-        PGVECTOR_TEST_DB_URL: ${{ secrets.PGVECTOR_TEST_DB_URL }}
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      run: |
-        poetry install -E postgres -E dev
-
-    - name: Set Poetry config
-      env:
-        PGVECTOR_TEST_DB_URL: ${{ secrets.PGVECTOR_TEST_DB_URL }}
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      run: |
-        poetry config virtualenvs.in-project false
-        poetry config virtualenvs.path ~/.virtualenvs
+        pip install -e .
+        pip install -r requirements-dev.txt
 
     - name: Run tests with pytest
       env:
         PGVECTOR_TEST_DB_URL: ${{ secrets.PGVECTOR_TEST_DB_URL }}
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
-        PGVECTOR_TEST_DB_URL=${{ secrets.PGVECTOR_TEST_DB_URL }} OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} poetry run pytest -s -vv tests
+        PGVECTOR_TEST_DB_URL=${{ secrets.PGVECTOR_TEST_DB_URL }} OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} pytest -s -vv tests

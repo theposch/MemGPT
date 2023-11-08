@@ -1,0 +1,27 @@
+name: publish
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Install build
+      run: |
+        pip install build
+    - name: Build pymemgpt
+      run: |
+        python3 -m build
+    - name: Upload to pypi
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        # repository-url: https://test.pypi.org/legacy/ # Uncomment to push to test pypi repo
+        password: ${{ secrets.PYPI_TOKEN }}
