@@ -59,12 +59,12 @@ def configure_llm_endpoint(config: MemGPTConfig):
         model_endpoint_type = "azure"
         _, model_endpoint, _, _, _ = get_azure_credentials()
     else:  # local models
-        backend_options = ["webui", "webui-legacy", "llamacpp", "koboldcpp", "ollama", "lmstudio", "openai"]
+        backend_options = ["webui", "webui-legacy", "llamacpp", "koboldcpp", "ollama", "lmstudio", "vllm", "openai"]
         default_model_endpoint_type = None
         if config.model_endpoint_type in backend_options:
             # set from previous config
             default_model_endpoint_type = config.model_endpoint_type
-        else:
+        if os.getenv("BACKEND_TYPE") and os.getenv("BACKEND_TYPE") in backend_options:
             # set form env variable (ok if none)
             default_model_endpoint_type = os.getenv("BACKEND_TYPE")
         model_endpoint_type = questionary.select(
@@ -81,6 +81,8 @@ def configure_llm_endpoint(config: MemGPTConfig):
             if model_endpoint_type in DEFAULT_ENDPOINTS:
                 default_model_endpoint = DEFAULT_ENDPOINTS[model_endpoint_type]
                 model_endpoint = questionary.text("Enter default endpoint:", default=default_model_endpoint).ask()
+            elif config.model_endpoint:
+                model_endpoint = questionary.text("Enter default endpoint:", default=config.model_endpoint).ask()
             else:
                 # default_model_endpoint = None
                 model_endpoint = None
@@ -116,13 +118,24 @@ def configure_model(config: MemGPTConfig, model_endpoint_type: str):
             ).ask()
             model = None if len(model) == 0 else model
 
+        # vllm needs huggingface model tag
+        if model_endpoint_type == "vllm":
+            default_model = config.model if config.model and config.model_endpoint_type == "vllm" else ""
+            model = questionary.text(
+                "Enter HuggingFace model tag (e.g. ehartford/dolphin-2.2.1-mistral-7b):",
+                default=default_model,
+            ).ask()
+            model = None if len(model) == 0 else model
+            model_wrapper = None  # no model wrapper for vLLM
+
         # model wrapper
-        available_model_wrappers = builtins.list(get_available_wrappers().keys())
-        model_wrapper = questionary.select(
-            f"Select default model wrapper (recommended: {DEFAULT_WRAPPER_NAME}):",
-            choices=available_model_wrappers,
-            default=DEFAULT_WRAPPER_NAME,
-        ).ask()
+        if model_endpoint_type != "vllm":
+            available_model_wrappers = builtins.list(get_available_wrappers().keys())
+            model_wrapper = questionary.select(
+                f"Select default model wrapper (recommended: {DEFAULT_WRAPPER_NAME}):",
+                choices=available_model_wrappers,
+                default=DEFAULT_WRAPPER_NAME,
+            ).ask()
 
     # set: context_window
     if str(model) not in LLM_MAX_TOKENS:
@@ -162,12 +175,10 @@ def configure_embedding_endpoint(config: MemGPTConfig):
     # configure embedding endpoint
 
     default_embedding_endpoint_type = config.embedding_endpoint_type
-    if config.embedding_endpoint_type is not None and config.embedding_endpoint_type not in ["openai", "azure"]:  # local model
-        default_embedding_endpoint_type = "local"
 
-    embedding_endpoint_type, embedding_endpoint, embedding_dim = None, None, None
+    embedding_endpoint_type, embedding_endpoint, embedding_dim, embedding_model = None, None, None, None
     embedding_provider = questionary.select(
-        "Select embedding provider:", choices=["openai", "azure", "local"], default=default_embedding_endpoint_type
+        "Select embedding provider:", choices=["openai", "azure", "hugging-face", "local"], default=default_embedding_endpoint_type
     ).ask()
     if embedding_provider == "openai":
         embedding_endpoint_type = "openai"
@@ -177,11 +188,38 @@ def configure_embedding_endpoint(config: MemGPTConfig):
         embedding_endpoint_type = "azure"
         _, _, _, _, embedding_endpoint = get_azure_credentials()
         embedding_dim = 1536
+    elif embedding_provider == "hugging-face":
+        # configure hugging face embedding endpoint (https://github.com/huggingface/text-embeddings-inference)
+        # supports custom model/endpoints
+        embedding_endpoint_type = "hugging-face"
+        embedding_endpoint = None
+
+        # get endpoint
+        embedding_endpoint = questionary.text("Enter default endpoint:").ask()
+        if "http://" not in embedding_endpoint and "https://" not in embedding_endpoint:
+            typer.secho(f"Endpoint must be a valid address", fg=typer.colors.YELLOW)
+            embedding_endpoint = None
+
+        # get model type
+        default_embedding_model = config.embedding_model if config.embedding_model else "BAAI/bge-large-en-v1.5"
+        embedding_model = questionary.text(
+            "Enter HuggingFace model tag (e.g. BAAI/bge-large-en-v1.5):",
+            default=default_embedding_model,
+        ).ask()
+
+        # get model dimentions
+        default_embedding_dim = config.embedding_dim if config.embedding_dim else "1024"
+        embedding_dim = questionary.text("Enter embedding model dimentions (e.g. 1024):", default=str(default_embedding_dim)).ask()
+        try:
+            embedding_dim = int(embedding_dim)
+        except Exception as e:
+            raise ValueError(f"Failed to cast {embedding_dim} to integer.")
     else:  # local models
         embedding_endpoint_type = "local"
         embedding_endpoint = None
         embedding_dim = 384
-    return embedding_endpoint_type, embedding_endpoint, embedding_dim
+
+    return embedding_endpoint_type, embedding_endpoint, embedding_dim, embedding_model
 
 
 def configure_cli(config: MemGPTConfig):
@@ -242,7 +280,7 @@ def configure():
     config = MemGPTConfig.load()
     model_endpoint_type, model_endpoint = configure_llm_endpoint(config)
     model, model_wrapper, context_window = configure_model(config, model_endpoint_type)
-    embedding_endpoint_type, embedding_endpoint, embedding_dim = configure_embedding_endpoint(config)
+    embedding_endpoint_type, embedding_endpoint, embedding_dim, embedding_model = configure_embedding_endpoint(config)
     default_preset, default_persona, default_human, default_agent = configure_cli(config)
     archival_storage_type, archival_storage_uri = configure_archival_storage(config)
 
@@ -275,6 +313,7 @@ def configure():
         embedding_endpoint_type=embedding_endpoint_type,
         embedding_endpoint=embedding_endpoint,
         embedding_dim=embedding_dim,
+        embedding_model=embedding_model,
         # cli configs
         preset=default_preset,
         persona=default_persona,
